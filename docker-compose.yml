@@ -3,7 +3,6 @@ version: "3.7"
 networks:
   n8n:
      driver: bridge
-
 services:
   caddy:
     image: caddy:latest
@@ -16,9 +15,7 @@ services:
     volumes:
       - ${DATA_FOLDER}/caddy_data:/data
       - ${DATA_FOLDER}/caddy_config:/config
-      - ${DATA_FOLDER}/caddy_config/Caddyfile:/etc/caddy/Caddyfile
-
-   db:
+      - ${DATA_FOLDER}/caddy_config/Caddyfile:/etc/caddy/Caddyfile db:
     image: postgres:14.1-alpine
     restart: always
     environment:
@@ -38,7 +35,6 @@ services:
       - n8n
     ports:
       - 6379:6379
-
   n8n:
     image: n8nio/n8n
     restart: always
@@ -65,6 +61,10 @@ services:
       - QUEUE_BULL_REDIS_HOST=redis
       - QUEUE_BULL_REDIS_PORT=6379
 
+    volumes:
+      - ${DATA_FOLDER}/.n8n:/home/node/.n8n
+      - ${DATA_FOLDER}/local_files:/files
+
   worker:
     image: n8nio/n8n
     restart: always
@@ -79,12 +79,7 @@ services:
       - EXECUTIONS_MODE=queue
       - QUEUE_BULL_REDIS_HOST=redis
       - QUEUE_BULL_REDIS_PORT=6379
-
-      command: n8n worker
-
-    volumes:
-      - ${DATA_FOLDER}/.n8n:/home/node/.n8n
-      - ${DATA_FOLDER}/local_files:/files
+    command: n8n worker
 
 volumes:
   caddy_data:
