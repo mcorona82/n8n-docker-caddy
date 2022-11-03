@@ -1,9 +1,15 @@
 version: "3.7"
 
+networks:
+  n8n:
+     driver: bridge
+
 services:
   caddy:
     image: caddy:latest
     restart: unless-stopped
+    networks:
+      - n8n
     ports:
       - "80:80"
       - "443:443"
@@ -12,9 +18,32 @@ services:
       - ${DATA_FOLDER}/caddy_config:/config
       - ${DATA_FOLDER}/caddy_config/Caddyfile:/etc/caddy/Caddyfile
 
+   db:
+    image: postgres:14.1-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    networks:
+      - n8n
+    ports:
+      - '5432:5432'
+    volumes:
+      - db:/var/lib/postgresql/data
+
+  redis:
+    image: redis:alpine
+    command: redis-server
+    networks:
+      - n8n
+    ports:
+      - 6379:6379
+
   n8n:
     image: n8nio/n8n
     restart: always
+    networks:
+      - n8n
     ports:
       - 5678:5678
     environment:
@@ -27,6 +56,32 @@ services:
       - NODE_ENV=production
       - WEBHOOK_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_DATABASE=postgres
+      - DB_POSTGRESDB_HOST=db
+      - DB_POSTGRESDB_PASSWORD=postgres
+      - DB_POSTGRESDB_USER=postgres
+      - EXECUTIONS_MODE=queue
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_PORT=6379
+
+  worker:
+    image: n8nio/n8n
+    restart: always
+    networks:
+      - n8n
+    environment:
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_DATABASE=postgres
+      - DB_POSTGRESDB_HOST=db
+      - DB_POSTGRESDB_PASSWORD=postgres
+      - DB_POSTGRESDB_USER=postgres
+      - EXECUTIONS_MODE=queue
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_PORT=6379
+
+      command: n8n worker
+
     volumes:
       - ${DATA_FOLDER}/.n8n:/home/node/.n8n
       - ${DATA_FOLDER}/local_files:/files
@@ -34,4 +89,6 @@ services:
 volumes:
   caddy_data:
     external: true
+  db:
+    driver: local
   caddy_config:
